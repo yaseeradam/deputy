@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "813733906604",
-    "project_id": "mlintex-17ad8",
-    "storage_bucket": "mlintex-17ad8.firebasestorage.app"
+    "project_number": "784183067097",
+    "project_id": "deputy-639a0",
+    "storage_bucket": "deputy-639a0.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:813733906604:android:3075f9f91ddcde1dc27709",
+        "mobilesdk_app_id": "1:784183067097:android:5963c31692f9a1371019c8",
         "android_client_info": {
-          "package_name": "com.example.shop_manager"
+          "package_name": "com.deputyenterprises.shop_manager"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB0bfuzfVO6PR28erEWn0dzVuwAa74vCn8"
+          "current_key": "AIzaSyCaLlf01NUB9mVQzpQJyU2dlM8vx-45-yA"
         }
       ],
       "services": {
