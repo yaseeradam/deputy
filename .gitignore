@@ -47,3 +47,4 @@ app.*.map.json
 # Backup data & deployment archives
 *backup*.json
 *.tar.gz
+*.apk
