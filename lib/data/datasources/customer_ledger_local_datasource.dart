@@ -1,0 +1,61 @@
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/customer_ledger_model.dart';
+import '../../core/services/pending_sync_tracker.dart';
+
+class CustomerLedgerLocalDataSource {
+  static const String _boxName = 'customer_ledger';
+
+  Future<Box> get _box async {
+    final authBox = Hive.box('auth');
+    final rawShopId = authBox.get('active_shop_id', defaultValue: '1')?.toString() ?? '1';
+    final shopId = (rawShopId.isEmpty || rawShopId == 'default') ? '1' : rawShopId;
+    return Hive.openBox('${_boxName}_$shopId');
+  }
+
+  Future<List<CustomerLedgerEntryModel>> getEntriesForCustomer(
+      String customerId) async {
+    final box = await _box;
+    return box.values
+        .map((e) => CustomerLedgerEntryModel.fromMap(e as Map))
+        .where((e) => e.customerId == customerId)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+  }
+
+  Future<void> saveEntry(CustomerLedgerEntryModel entry) async {
+    final box = await _box;
+    await box.put(entry.id, entry.toMap());
+    PendingSyncTracker.markPending(box.name, entry.id);
+  }
+
+  Future<void> deleteEntry(String id) async {
+    final box = await _box;
+    await box.delete(id);
+    PendingSyncTracker.markPendingDelete(box.name, id);
+  }
+
+  Future<void> deleteAllForCustomer(String customerId) async {
+    final box = await _box;
+    final keys = box.values
+        .map((e) => CustomerLedgerEntryModel.fromMap(e as Map))
+        .where((e) => e.customerId == customerId)
+        .map((e) => e.id)
+        .toList();
+    await box.deleteAll(keys);
+    for (final key in keys) {
+      PendingSyncTracker.markPendingDelete(box.name, key);
+    }
+  }
+
+  Stream<List<CustomerLedgerEntryModel>> watchEntriesForCustomer(
+      String customerId) async* {
+    final box = await _box;
+    List<CustomerLedgerEntryModel> parse() => box.values
+        .map((e) => CustomerLedgerEntryModel.fromMap(e as Map))
+        .where((e) => e.customerId == customerId)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    yield parse();
+    yield* box.watch().map((_) => parse());
+  }
+}

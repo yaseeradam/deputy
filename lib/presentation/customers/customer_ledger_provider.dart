@@ -1,0 +1,174 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../domain/entities/customer_ledger_entry.dart';
+import '../../domain/repositories/customer_ledger_repository.dart';
+import '../../core/providers/repository_providers.dart';
+
+import '../products/product_provider.dart';
+
+List<CustomerLedgerEntry> _computeBalances(List<CustomerLedgerEntry> entries) {
+  double balance = 0;
+  final result = <CustomerLedgerEntry>[];
+  for (final e in entries) {
+    // OUT (goods given on credit) → balance increases
+    // IN (payment received) → balance decreases
+    if (e.outDescription != null && e.outDescription!.isNotEmpty) {
+      balance += e.totalAmount;
+    } else {
+      balance -= e.totalAmount;
+    }
+    result.add(e.copyWith(totalBalance: balance));
+  }
+  return result;
+}
+
+final customerLedgerProvider =
+    StreamProvider.family<List<CustomerLedgerEntry>, String>(
+  (ref, customerId) {
+    return ref
+        .watch(customerLedgerRepositoryProvider)
+        .watchEntriesForCustomer(customerId)
+        .map(_computeBalances);
+  },
+);
+
+class CustomerLedgerNotifier extends Notifier<AsyncValue<void>> {
+  final _uuid = const Uuid();
+
+  @override
+  AsyncValue<void> build() => const AsyncValue.data(null);
+
+  CustomerLedgerRepository get _repo =>
+      ref.read(customerLedgerRepositoryProvider);
+
+  Future<void> addSaleEntry({
+    required String customerId,
+    required String itemName,
+    required double price,
+    required int quantity,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final entry = CustomerLedgerEntry(
+        id: _uuid.v4(),
+        customerId: customerId,
+        date: DateTime.now(),
+        inDescription: null,
+        outDescription: itemName,
+        price: price.toString(),
+        quantity: quantity,
+        totalAmount: price * quantity,
+        totalBalance: 0, // recomputed by stream
+        updatedAt: DateTime.now(),
+      );
+      await _repo.addEntry(entry);
+
+      // Automatically deduct store product stock if matching product exists
+      try {
+        final allProds = await ref.read(productRepositoryProvider).getAllProducts();
+        final matches = allProds.where(
+          (p) => p.name.trim().toLowerCase() == itemName.trim().toLowerCase(),
+        );
+        if (matches.isNotEmpty) {
+          await ref.read(productNotifierProvider.notifier).updateQuantity(matches.first.id, -quantity);
+        }
+      } catch (_) {}
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> addPaymentEntry({
+    required String customerId,
+    required String bankOrCash,
+    required double amount,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final entry = CustomerLedgerEntry(
+        id: _uuid.v4(),
+        customerId: customerId,
+        date: DateTime.now(),
+        inDescription: bankOrCash,
+        outDescription: null,
+        price: amount.toString(),
+        quantity: null,
+        totalAmount: amount,
+        totalBalance: 0, // recomputed by stream
+        updatedAt: DateTime.now(),
+      );
+      await _repo.addEntry(entry);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> updateEntry(CustomerLedgerEntry updated) async {
+    state = const AsyncValue.loading();
+    try {
+      try {
+        final entries = await _repo.getEntriesForCustomer(updated.customerId);
+        final oldMatches = entries.where((e) => e.id == updated.id);
+        if (oldMatches.isNotEmpty) {
+          final old = oldMatches.first;
+          final oldQty = old.quantity ?? 0;
+          final newQty = updated.quantity ?? 0;
+          final delta = newQty - oldQty;
+          final itemName = updated.outDescription ?? old.outDescription;
+          if (delta != 0 && itemName != null && itemName.trim().isNotEmpty) {
+            final allProds = await ref.read(productRepositoryProvider).getAllProducts();
+            final matches = allProds.where(
+              (p) => p.name.trim().toLowerCase() == itemName.trim().toLowerCase(),
+            );
+            if (matches.isNotEmpty) {
+              await ref.read(productNotifierProvider.notifier).updateQuantity(matches.first.id, -delta);
+            }
+          }
+        }
+      } catch (_) {}
+
+      await _repo.updateEntry(updated.copyWith(updatedAt: DateTime.now()));
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteEntry(String entryId, {String? customerId}) async {
+    state = const AsyncValue.loading();
+    try {
+      if (customerId != null) {
+        try {
+          final entries = await _repo.getEntriesForCustomer(customerId);
+          final matches = entries.where((e) => e.id == entryId);
+          if (matches.isNotEmpty) {
+            final entry = matches.first;
+            final qty = entry.quantity ?? 0;
+            if (qty > 0 && entry.outDescription != null && entry.outDescription!.trim().isNotEmpty) {
+              final allProds = await ref.read(productRepositoryProvider).getAllProducts();
+              final prodMatches = allProds.where(
+                (p) => p.name.trim().toLowerCase() == entry.outDescription!.trim().toLowerCase(),
+              );
+              if (prodMatches.isNotEmpty) {
+                await ref.read(productNotifierProvider.notifier).updateQuantity(prodMatches.first.id, qty);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      await _repo.deleteEntry(entryId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final customerLedgerNotifierProvider =
+    NotifierProvider<CustomerLedgerNotifier, AsyncValue<void>>(
+  CustomerLedgerNotifier.new,
+);

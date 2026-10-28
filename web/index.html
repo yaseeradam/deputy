@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Deputy Enterprises - Modern Store & Bookkeeping Management System">
+
+  <!-- PWA & Theme color -->
+  <meta name="theme-color" content="#059669">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Apple iOS PWA meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Deputy">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Deputy Enterprises</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #061A14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #loading-splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 30%, #0D2821 0%, #061A14 70%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+    }
+    .logo-container {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 24px;
+    }
+    .logo-glow {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      background: #059669;
+      filter: blur(20px);
+      opacity: 0.35;
+      animation: pulse 2s infinite ease-in-out;
+    }
+    .logo-img {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      border-radius: 22px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      object-fit: cover;
+    }
+    .app-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #F8FAFC;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .app-subtitle {
+      font-size: 13px;
+      color: #94A3B8;
+      margin-bottom: 28px;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(5, 150, 105, 0.15);
+      border-top-color: #059669;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.25; transform: scale(0.95); }
+      50% { opacity: 0.5; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-splash">
+    <div class="logo-container">
+      <div class="logo-glow"></div>
+      <img src="icons/Icon-192.png" alt="Deputy Enterprises Logo" class="logo-img">
+    </div>
+    <div class="app-title">Deputy Enterprises</div>
+    <div class="app-subtitle">Store & Bookkeeping Manager</div>
+    <div class="spinner"></div>
+  </div>
+
+  <script>
+    // PWA Install Prompt Capture
+    window.deferredPwaPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.deferredPwaPrompt = e;
+      console.log('[PWA] beforeinstallprompt event captured');
+    });
+
+    window.triggerPwaInstall = function () {
+      if (window.deferredPwaPrompt) {
+        window.deferredPwaPrompt.prompt();
+        window.deferredPwaPrompt.userChoice.then(function (choiceResult) {
+          console.log('[PWA] userChoice outcome:', choiceResult.outcome);
+          window.deferredPwaPrompt = null;
+        }).catch(function (err) {
+          console.error('[PWA] Error in userChoice:', err);
+        });
+        return true;
+      }
+      return false;
+    };
+
+    window.isPwaInstalled = function () {
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone === true ||
+                         document.referrer.includes('android-app://');
+      return !!isStandalone;
+    };
+
+    window.canPromptPwaInstall = function () {
+      return window.deferredPwaPrompt !== null;
+    };
+
+    window.isAppleDevice = function () {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
+    function dismissSplash() {
+      var splash = document.getElementById('loading-splash');
+      if (splash) {
+        splash.style.pointerEvents = 'none';
+        splash.style.opacity = '0';
+        setTimeout(function () {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 350);
+      }
+    }
+
+    window.addEventListener('flutter-first-frame', dismissSplash);
+    // Fallback: Ensure splash is removed after 3.5s so touches can never be trapped
+    setTimeout(dismissSplash, 3500);
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
