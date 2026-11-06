@@ -18,24 +18,6 @@ import 'presentation/sales_ledger/sales_ledger_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint('Firebase.initializeApp error: $e');
-  }
-
-  // Pre-authenticate canonical Firebase Auth session so Firestore queries are ready immediately
-  try {
-    await FirestoreService.ensureAuthenticated(
-      canonicalEmail: 'deputyenterprises@gmail.com',
-      canonicalPassword: 'deputy123',
-    );
-  } catch (e) {
-    debugPrint('Firebase Auth bootstrap error: $e');
-  }
-
   await Hive.initFlutter();
   Hive.registerAdapter(ProductModelAdapter());
   Hive.registerAdapter(CustomerModelAdapter());
@@ -56,12 +38,29 @@ Future<void> main() async {
 
   await NotificationService.init();
 
-  // One-time migration of any legacy Hive records into Firestore
   try {
-    await FirestoreService.migrateLocalHiveToFirestore();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
-    debugPrint('Migration error: $e');
+    debugPrint('Firebase.initializeApp error: $e');
   }
+
+  // Await Firebase Auth before runApp() so all Firestore queries have a valid
+  // currentUser.uid from the very first render (fixes iPhone/Safari data issue).
+  try {
+    await FirestoreService.ensureAuthenticated(
+      canonicalEmail: 'deputyenterprises@gmail.com',
+      canonicalPassword: 'deputy123',
+    ).timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint('Firebase Auth bootstrap error (continuing offline): $e');
+  }
+
+  // Run migration in background after auth — does not block the UI
+  FirestoreService.migrateLocalHiveToFirestore().catchError((e) {
+    debugPrint('Migration error: $e');
+  });
 
   runApp(
     const ProviderScope(
